@@ -1,0 +1,101 @@
+---
+title: "EC"
+author: "Jiaqi He"
+date: "2024-02-18"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# cleaning.
+
+```{r, echo=FALSE,show_col_types = FALSE}
+library(dplyr)
+housing = read.csv("EC/Housing.csv")
+n = dim(housing)[1]
+cleanhousing <- housing %>% select_if(is.numeric)
+cleanhousing1 <- cleanhousing %>% mutate(
+  mainroad = ifelse(housing$mainroad == "yes", 1, 0),
+  guestroom = ifelse(housing$guestroom == "yes", 1, 0),
+  basement = ifelse(housing$basement == "yes", 1, 0), hotwaterheating = ifelse(housing$hotwaterheating == "yes", 1, 0), airconditioning = ifelse(housing$airconditioning == "yes", 1, 0), prefarea = ifelse(housing$prefarea == "yes", 1, 0),
+  furnistatfur = ifelse(housing$furnishingstatus == "furnished",1,0), furnistatunfur = ifelse(housing$furnishingstatus == "unfurnished",1,0)
+)
+cleanhousing2 <- cleanhousing1 %>%
+  mutate(
+    furnistatsemi = ifelse(housing$furnishingstatus == "semi-furnished",1,0)
+  )
+dropcleanhousing2 <- cleanhousing2 %>%
+ filter(!(row_number() %in% c(1,3,5,16)))
+summary(cleanhousing1)
+library(ggplot2)
+
+```
+
+\newpage
+# manipulation
+
+```{r}
+h = cleanhousing2
+```
+outliers
+
+# exploratory data analysis
+```{r}
+average_by_bedroom <- h %>%
+  group_by(bedrooms) %>%
+  summarize(across(everything(), mean, na.rm = TRUE))
+print(average_by_bedroom)
+?par
+
+ggplot(average_by_bedroom, aes(y = bedrooms)) +
+  geom_point(aes(x = area), color = "blue") +
+  labs(x = "area", y = "number of bedrooms", title = "bedroom relation with area") +
+  theme_minimal()
+
+ggplot(average_by_bedroom, aes(y = bedrooms)) +
+  geom_point(aes(x = bathrooms), color = "red")  +
+  labs(x = "number of bathrooms", y = "number of bedrooms", title = "bedroom relation with bathroom") +
+  theme_minimal()
+
+
+ggplot(average_by_bedroom, aes(y = bedrooms)) +
+  geom_point(aes(x = stories), color = "green")  +
+  labs(x = "stories", y = "number of bedrooms", title = "bedroom relation with stories") +
+  theme_minimal()
+```
+bedroom not significant probably because the linear relation with other features.
+
+
+
+# modeling
+```{r}
+basic = lm(price ~ 0 + ., data = cleanhousing2)
+basicdrop = lm(price ~ 0 + ., data = dropcleanhousing2)
+summary(basic)
+```
+delete stupid data of 6 bedrooms create no difference, but even worse in modeling... Maybe because there are only 2 rows of 6 bedrooms.
+
+
+# better model
+```{r}
+significant2 = lm(price ~ 0+bathrooms+area+stories+parking+mainroad+basement
+                 +hotwaterheating+airconditioning+prefarea+furnistatunfur
+                 , data = dropcleanhousing2)
+summary(significant)
+anova(significant2,basicdrop)
+```
+can delete features: bedrooms, semi furnitured and furnitured(greater p-values), guestroom(even in 0.05 range)
+
+
+# analyze model
+```{r}
+# summary(significant)
+# AIC(significant)
+ggplot(data = cleanhousing2, aes(x = factor(bedrooms), y = price)) +
+  geom_boxplot(fill = "blue", color = "black") +
+  scale_y_continuous(labels = scales::comma) +
+  labs(x = "number of bedrooms", y = "price", title = "relationship between bedroom and price")
+```
+AIC is so bad... I have no idea why the coefficients are so big... 
